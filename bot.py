@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
 
-BOT_TOKEN = "8876534015:AAEJU0yjB0LGuc1VTVwQ0sk-2rjvaxgIQeU"
+BOT_TOKEN = "8876534015:AAGu7O8CT4wzadtvnjx03cHVLzX_HE0-wHQ"
 BANNER_PHOTO = "AgACAgIAAxkBAAIBiGqLCJuWH773Aa3GUIjUZ-6iittbAAJzImsbgfNISIhmjZTluA4eAQADAgADeQADPQQ"
 
 # Разрешенные ID для просмотра списка пользователей
