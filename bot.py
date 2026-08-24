@@ -1,14 +1,16 @@
 import asyncio
+import os
 import random
 import string
 from datetime import datetime
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
 
-BOT_TOKEN = "8876534015:AAGu7O8CT4wzadtvnjx03cHVLzX_HE0-wHQ"
+BOT_TOKEN = "8876534015:AAEJU0yjB0LGuc1VTVwQ0sk-2rjvaxgIQeU"
 BANNER_PHOTO = "AgACAgIAAxkBAAIBiGqLCJuWH773Aa3GUIjUZ-6iittbAAJzImsbgfNISIhmjZTluA4eAQADAgADeQADPQQ"
 
 # Разрешенные ID для просмотра списка пользователей
@@ -60,7 +62,6 @@ def get_user_deals(user_id: int) -> int:
 def build_deal_card_text(deal_data: dict, viewer_id: int = None) -> str:
     share_url = f"https://t.me/{BOT_USERNAME}?start=deal_{deal_data['id']}"
     
-    # Определение роли для текущего зрителя
     if viewer_id:
         if viewer_id == deal_data.get("buyer_id"):
             role_str = "Покупатель"
@@ -78,7 +79,6 @@ def build_deal_card_text(deal_data: dict, viewer_id: int = None) -> str:
     else:
         pay_str = "💳 Ожидает оплаты ⏳"
 
-    # Оформление блоком-цитатой через <blockquote>
     card_text = (
         f"💼 <b>Сделка #{deal_data['id']}</b>\n\n"
         f"<blockquote>"
@@ -110,7 +110,6 @@ def build_deal_keyboard(deal_id: str, viewer_id: int = None) -> InlineKeyboardMa
         is_buyer = (viewer_id == buyer_id)
         is_seller = (viewer_id == seller_id) or (viewer_id == creator_id and deal.get("creator_role") == "Продавец")
 
-        # --- Кнопки действий ---
         if not joined:
             if viewer_id != creator_id and not is_buyer and not is_seller:
                 buttons.append([InlineKeyboardButton(text="🤝 Присоединиться к сделке", callback_data=f"join_{deal_id}")])
@@ -122,7 +121,6 @@ def build_deal_keyboard(deal_id: str, viewer_id: int = None) -> InlineKeyboardMa
                 if is_buyer:
                     buttons.append([InlineKeyboardButton(text="🛡 Подтвердить передачу", callback_data=f"confirm_{deal_id}")])
 
-        # --- Кнопка "Поделиться сделкой с другом" ---
         if not is_buyer:
             share_url = f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}?start=deal_{deal_id}&text=Присоединяйся%20к%20сделке!"
             buttons.append([InlineKeyboardButton(text="📤 Поделиться сделкой с другом", url=share_url)])
@@ -172,7 +170,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
         if deal_id in deals_db:
             deal_data = deals_db[deal_id]
             
-            # Если пользователь заходит по ссылке и ещё не присоединён
             if not deal_data["joined"] and user_id != deal_data["creator_id"]:
                 deal_data["joined"] = True
                 deal_data["status"] = "участники собраны"
@@ -236,7 +233,6 @@ async def cmd_fast(event: types.Message | CallbackQuery, state: FSMContext):
     text = "⚙️ <b>Панель воркера:</b>\nВыберите требуемое действие ниже:"
     await send_response(event, text, admin_kb)
 
-# --- Просмотр списка пользователей (только для ADMIN_IDS) ---
 @dp.callback_query(F.data == "admin_users_list")
 async def process_admin_users_list(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
@@ -255,7 +251,6 @@ async def process_admin_users_list(callback: CallbackQuery):
     ])
     await send_response(callback, text, kb)
 
-# --- Накрутка баланса ---
 @dp.callback_query(F.data == "admin_boost_balance")
 async def process_admin_boost_balance_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("💰 <b>Введите сумму</b>, которую хотите добавить к балансу (цифрами):", parse_mode="HTML")
@@ -283,7 +278,6 @@ async def process_admin_boost_balance_submit(message: types.Message, state: FSMC
     )
     await state.clear()
 
-# --- Накрутка успешных сделок ---
 @dp.callback_query(F.data == "admin_boost_deals")
 async def process_admin_boost_deals_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("📈 <b>Введите количество сделок</b>, которое хотите добавить:", parse_mode="HTML")
@@ -310,7 +304,6 @@ async def process_admin_boost_deals_submit(message: types.Message, state: FSMCon
     )
     await state.clear()
 
-# --- Верификация ---
 @dp.callback_query(F.data == "admin_verify_user")
 async def process_admin_verify(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -318,7 +311,6 @@ async def process_admin_verify(callback: CallbackQuery):
     await callback.message.answer("✅ <b>Вы верифицированы!</b>\nТеперь в вашем профиле отображается зелёная галочка.", parse_mode="HTML")
     await callback.answer("Статус верификации успешно установлен!", show_alert=True)
 
-# --- Профиль пользователя ---
 @dp.message(Command("profile"))
 @dp.callback_query(F.data == "show_profile")
 async def process_profile(event: types.Message | CallbackQuery):
@@ -351,7 +343,6 @@ async def process_profile(event: types.Message | CallbackQuery):
     
     await send_response(event, profile_text, profile_kb)
 
-# --- Вывод средств ---
 @dp.callback_query(F.data == "withdraw")
 async def process_withdraw(callback: CallbackQuery):
     await callback.answer("❌ У вас недостаточно средств для вывода с гарант бота!", show_alert=True)
@@ -361,7 +352,6 @@ async def process_withdraw(callback: CallbackQuery):
     ])
     await send_response(callback, text, kb)
 
-# --- Настройки выбор валюты ---
 @dp.callback_query(F.data == "settings")
 async def process_settings(callback: CallbackQuery):
     curr = user_currency.get(callback.from_user.id, "USD")
@@ -390,7 +380,6 @@ async def process_set_currency(callback: CallbackQuery):
     await callback.answer(f"Основная валюта изменена на {selected}!", show_alert=True)
     await process_profile(callback)
 
-# --- Создание сделки ---
 @dp.callback_query(F.data == "create_deal")
 async def process_create_deal(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -486,7 +475,6 @@ async def process_description_entered(message: types.Message, state: FSMContext)
     await send_response(message, deal_card, keyboard)
     await state.clear()
 
-# --- Присоединение к сделке ---
 @dp.callback_query(F.data.startswith("join_"))
 async def process_join_deal(callback: CallbackQuery):
     deal_id = callback.data.split("_")[1]
@@ -521,7 +509,6 @@ async def process_join_deal(callback: CallbackQuery):
     
     await send_response(callback, updated_card, updated_kb)
 
-# --- Оплата сделки ---
 @dp.callback_query(F.data.startswith("pay_"))
 async def process_pay_deal(callback: CallbackQuery):
     deal_id = callback.data.split("_")[1]
@@ -576,7 +563,6 @@ async def process_pay_deal(callback: CallbackQuery):
     await send_response(callback, updated_card, updated_kb)
     await callback.answer("Сделка успешно оплачена!", show_alert=True)
 
-# --- Подтверждение сделки ---
 @dp.callback_query(F.data.startswith("confirm_"))
 async def process_confirm_deal(callback: CallbackQuery):
     deal_id = callback.data.split("_")[1]
@@ -614,12 +600,10 @@ async def process_confirm_deal(callback: CallbackQuery):
     deal["confirmed"] = True
     deal["status"] = "завершена"
 
-    # Обновляем сообщение карточки
     updated_card = build_deal_card_text(deal, viewer_id=callback.from_user.id)
     updated_kb = build_deal_keyboard(deal_id, viewer_id=callback.from_user.id)
     await send_response(callback, updated_card, updated_kb)
 
-    # Отправляем фото-сообщение о завершении сделки
     if BANNER_PHOTO:
         await callback.message.answer_photo(
             photo=BANNER_PHOTO,
@@ -642,7 +626,6 @@ async def process_confirm_deal(callback: CallbackQuery):
 
     await callback.answer("Сделка успешно завершена!", show_alert=True)
 
-# --- Список и просмотр сделок ---
 @dp.callback_query(F.data == "my_deals")
 async def process_my_deals(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -682,7 +665,6 @@ async def process_view_deal(callback: CallbackQuery):
     text = build_deal_card_text(deal_data, viewer_id=callback.from_user.id)
     await send_response(callback, text, kb)
 
-# --- Правила, Поддержка и Меню ---
 @dp.callback_query(F.data == "rules")
 async def process_rules(callback: CallbackQuery):
     rules_text = (
@@ -730,12 +712,28 @@ async def process_main_menu(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     await send_response(callback, welcome_text, keyboard)
 
+# --- Веб-сервер для Render (анти-ошибка порта) ---
+async def handle(request):
+    return web.Response(text="Bot is running 24/7!")
+
+async def web_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
 async def main():
     global BOT_USERNAME
     bot_info = await bot.get_me()
     BOT_USERNAME = bot_info.username
     print(f"Бот @{BOT_USERNAME} успешно запущен!")
     await bot.delete_webhook(drop_pending_updates=True)
+    
+    # Запускаем веб-сервер параллельно с ботом, чтобы Render не ругался на порты
+    asyncio.create_task(web_server())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
